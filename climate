@@ -1,0 +1,377 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+
+# Análise
+
+dados_df = pd.read_csv("Dados.csv")
+display(dados_df) # Exibe as primeiras / últimas 5 linhas
+
+max_index = dados_df['Precipitation (mm)'].idxmax()
+min_index = dados_df['Precipitation (mm)'].idxmin()
+# Obtém o índice da linha com o valor máximo / mínimo na coluna de precipitação
+
+max_row = dados_df.loc[max_index]
+min_row = dados_df.loc[min_index]
+print(f"Ano/Mês com maior precipitação:\n", max_row)
+print(f"Ano/Mês com menor precipitação:\n", min_row)
+# Obtém a linha inteira correspondente aos valores máximo e mínimo
+
+
+avg_precipitation_per_month = dados_df.groupby('Month')['Precipitation (mm)'].mean()
+print(avg_precipitation_per_month)
+# Agrupa por mês, depois calcula a média de precipitação
+
+yearly_precipitation = dados_df.groupby('Year')['Precipitation (mm)'].sum() 
+display(yearly_precipitation)
+# Agrupa os dados por ano, depois calcula a precipitação total para cada ano
+
+monthly_avg_precipitation = dados_df.groupby('Month')['Precipitation (mm)'].mean()
+# Calcula a precipitação média por mês
+
+dados_df = dados_df.merge(monthly_avg_precipitation.rename('Avg_Monthly_Precipitation'), on='Month')
+# Mescla a precipitação média mensal de volta ao df original
+
+dados_df['Precipitation_Comparison'] = dados_df['Precipitation (mm)'] - dados_df['Avg_Monthly_Precipitation']
+# Determina se cada mês teve mais ou menos precipitação do que a média
+
+result = dados_df.groupby(['Year', 'Month']).agg({
+    'Precipitation (mm)': 'sum',  # Precipitação total
+    'Avg_Monthly_Precipitation': 'mean',  # Precipitação média
+    'Precipitation_Comparison': 'mean'  # Quanto chove for a mais ou a menos comparado à média
+}).reset_index()
+print(result)
+# Resumo
+yearly_precipitation = dados_df.groupby('Year')['Precipitation (mm)'].mean().reset_index()
+yearly_precipitation.rename(columns={'Precipitation (mm)': 'Avg_Yearly_Precipitation'}, inplace=True)
+print(yearly_precipitation)
+# Agrupa a precipitação por ano para obter a média anual
+
+# Plotting
+
+# 1. Precipitação
+
+# Escolher a fonte
+mpl.rcParams['font.family'] = 'Avenir'
+
+# Criar uma figura com subplots
+fig, axes = plt.subplots(4, 3, figsize=(18, 24), sharex=True, sharey=True)
+axes = axes.flatten()  # Facilita a iteração sobre os subplots
+
+# Definir o estilo de fundo
+sns.set_theme(style="whitegrid")
+
+# Definir as cores para os marcadores baseadas na comparação com a média
+colors = {'below_avg': 'lightsalmon', 'above_avg': 'lightskyblue'}
+
+# Criar os gráficos
+for month in range(1, 13):  # Para cada mês, de 1 a 12
+    subset = monthly_precipitation[monthly_precipitation['Month'] == month].copy()
+    ax = axes[month - 1]
+
+    # Adicionar uma coluna com base na comparação com a média
+    subset.loc[:, 'color'] = subset['Precipitation (mm)'].apply(
+        lambda x: 'below_avg' if x < average_precipitation[month] else 'above_avg'
+    )
+
+    # Plotar as linhas
+    sns.lineplot(data=subset, x='YearMonth', y='Precipitation (mm)', ax=ax, color='gray', linestyle='--', linewidth=1, zorder=2)
+
+    # Plotar a área
+    ax.fill_between(subset['YearMonth'], subset['Precipitation (mm)'], alpha=0.1, color='gray', zorder=1)
+
+    # Plotar os dados com cores individuais para os marcadores
+    sns.scatterplot(data=subset, x='YearMonth', y='Precipitation (mm)', hue='color',
+                    palette=colors, s=100, ax=ax, legend=False, marker='o', zorder=5)
+
+    # Adicionar as hastas
+    for i in range(len(subset)):
+        ax.plot([subset['YearMonth'].iloc[i]] * 2,
+                [0, subset['Precipitation (mm)'].iloc[i]],
+                color='white', linestyle=' ', linewidth=2, zorder=1)  # Deixei-as ocultas para melhor visualização
+    
+    # Adicionar a linha de tendência para a média de precipitação
+    avg_line_y = average_precipitation[month]
+    ax.axhline(avg_line_y, color='crimson', linestyle='-', linewidth=2, zorder=3)
+    
+    # Adicionar o valor para a média de precipitação 
+    ax.text(subset['YearMonth'].max() + pd.DateOffset(days=20), avg_line_y, f'{avg_line_y:.1f}', color='crimson', 
+            ha='left', va='center', fontsize=16, fontweight='bold', bbox=dict(facecolor='white', edgecolor='none', alpha=0.8),
+            fontfamily='Avenir')
+    
+    # Ajustar o limite do eixo y para se ajustar bem aos dados
+    ax.set_ylim(0, max(650, subset['Precipitation (mm)'].max() * 1.1))
+    
+    # Ajustar os labels do eixo x para mostrar apenas o ano
+    ax.set_xticks(pd.date_range(start=monthly_precipitation['YearMonth'].min(), 
+                                end=monthly_precipitation['YearMonth'].max(), 
+                                freq='5Y'))
+    ax.set_xticklabels([dt.strftime('%Y').upper() for dt in pd.date_range(start=monthly_precipitation['YearMonth'].min(), 
+                                                                    end=monthly_precipitation['YearMonth'].max(), 
+                                                                    freq='5Y')], 
+                       rotation=45, 
+                       ha='right', fontsize=14, fontfamily='Avenir')
+    
+    # Adicionar linhas horizontais no eixo y para ajudar na leitura
+    ax.yaxis.grid(True, linestyle='--', color='lightgray', alpha=0.7)
+
+    # Configurar os rótulos e o título para cada gráfico
+    ax.set_title(pd.to_datetime(f'2000-{month:02d}-01').strftime('%B').upper(), fontsize=16, fontweight='bold', fontfamily='Avenir')
+    ax.set_xlabel('YEAR'.upper(), fontsize=14, fontweight='bold', fontfamily='Avenir Next')
+    ax.set_ylabel('PRECIPITATION (MM)'.upper(), fontsize=14, fontweight='bold', fontfamily='Avenir Next')
+
+    # Adicionar uma borda leve em torno dos eixos
+    for spine in ax.spines.values():
+        spine.set_edgecolor('lightgray')
+        spine.set_linewidth(1)
+
+# Adicionar as anotações para os meses de Janeiro e Dezembro
+axes[0].annotate(f'BIGGEST RAINFALL\nVARIATION', 
+                  xy=(0.05, 0.95), xycoords='axes fraction', fontsize=12, color='black',
+                  bbox=dict(facecolor='white', edgecolor='none', alpha=0.7),
+                  fontfamily='Avenir')
+#
+axes[-1].annotate(f'BIGGEST RAINFALL\nINCREASE', 
+                  xy=(0.05, 0.95), xycoords='axes fraction', fontsize=12, color='black',
+                  bbox=dict(facecolor='white', edgecolor='none', alpha=0.7),
+                  fontfamily='Avenir')
+
+# Adicionar a legenda
+handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors['below_avg'], markersize=10, label='BELOW AVG'),
+           plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors['above_avg'], markersize=10, label='ABOVE AVG')]
+
+axes[0].legend(handles=handles, title='', fontsize='14', frameon=False, 
+                prop={'family': 'Avenir'})
+
+# Adicionar título e fonte em maiúsculas
+fig.suptitle("PRECIPITATION VARIATION IN SÃO JOSÉ DO RIO PRETO, BRAZIL\n(1998-2024)".upper(), fontsize=24, fontweight='bold', fontfamily='Avenir Next')
+plt.figtext(0.95, 0.02, 'Source: Portal Agrometeorológico e Hidrológico do Estado de São Paulo'.upper(), 
+            ha='right', fontsize=14, color='black', fontfamily='Avenir', fontstyle='italic')
+
+# Ajustar o layout para remover espaço nas laterais
+plt.tight_layout(rect=[0, 0.05, 0.95, 0.95])
+
+# Salvar o gráfico em alta qualidade
+title = "PRECIPITATION_VARIATION".replace("\n", "_").replace(" ", "_")
+plt.savefig(f"{title}.png", format='png', dpi=300, bbox_inches='tight')
+
+# Exibir o gráfico
+
+# 2. Temperatura
+
+# Definir a fonte
+mpl.rcParams['font.family'] = 'Avenir'
+
+# Criar uma figura com subplots
+fig, axes = plt.subplots(4, 3, figsize=(18, 24), sharex=True, sharey=True)
+axes = axes.flatten()  # Facilita a iteração sobre os subplots
+
+# Definir o estilo de fundo
+sns.set_theme(style="white")
+
+# Calcular a média mínima e máxima para cada mês ao longo dos anos
+monthly_avg_min_temp = dados_df.groupby('Month')['Min Avg Temperature (°C)'].mean()
+monthly_avg_max_temp = dados_df.groupby('Month')['Max Avg Temperature (°C)'].mean()
+
+# Criar os gráficos
+for month in range(1, 13):  # Para cada mês de 1 a 12
+    subset = dados_df[dados_df['Month'] == month].copy()
+    ax = axes[month - 1]
+
+    # Plotar a linha de tendência da temperatura média máxima
+    ax.plot(subset['Year'], subset['Max Avg Temperature (°C)'], color='lightsalmon', linestyle='-', linewidth=2, zorder=2)
+    
+    # Plotar a linha de tendência da temperatura média mínima
+    ax.plot(subset['Year'], subset['Min Avg Temperature (°C)'], color='lightskyblue', linestyle='-', linewidth=2, zorder=2)
+
+    # Preencher a área entre os marcadores
+    ax.fill_between(subset['Year'], subset['Min Avg Temperature (°C)'], subset['Max Avg Temperature (°C)'],
+                    color='lightgray', alpha=0.3, zorder=1)
+    
+    # Plotar as hastes com temperatura máxima e mínima
+    for i in range(len(subset)):
+        ax.plot([subset['Year'].iloc[i]] * 2,
+                [subset['Min Avg Temperature (°C)'].iloc[i], subset['Max Avg Temperature (°C)'].iloc[i]],
+                color='whitesmoke', linestyle='-', linewidth=2.5, zorder=1)
+        ax.fill_between([subset['Year'].iloc[i]] * 2,
+                        subset['Min Avg Temperature (°C)'].iloc[i], subset['Max Avg Temperature (°C)'].iloc[i],
+                        color='lightgray', alpha=0.5)
+        
+        # Marcador para temperatura mínima
+        ax.scatter(subset['Year'].iloc[i], subset['Min Avg Temperature (°C)'].iloc[i], color='lightskyblue', s=100, zorder=5)
+        # Marcador para temperatura máxima
+        ax.scatter(subset['Year'].iloc[i], subset['Max Avg Temperature (°C)'].iloc[i], color='lightsalmon', s=100, zorder=5)
+
+    # Adicionar linhas de tendência para a média mínima e máxima
+    min_avg_line = monthly_avg_min_temp[month]
+    max_avg_line = monthly_avg_max_temp[month]
+    ax.axhline(min_avg_line, color='deepskyblue', linestyle='--', linewidth=2, zorder=3)
+    ax.axhline(max_avg_line, color='darksalmon', linestyle='--', linewidth=2, zorder=3)
+
+    # Adicionar o valor das médias no canto superior direito
+    ax.text(subset['Year'].max() + 0.5, min_avg_line, f'{min_avg_line:.1f}°C', fontfamily='Avenir Next', color='deepskyblue', 
+            ha='left', va='center', fontsize=16, fontweight='bold', bbox=dict(facecolor='white', edgecolor='none', alpha=0.8))
+    ax.text(subset['Year'].max() + 0.5, max_avg_line, f'{max_avg_line:.1f}°C', fontfamily='Avenir Next', color='darksalmon', 
+            ha='left', va='center', fontsize=16, fontweight='bold', bbox=dict(facecolor='white', edgecolor='none', alpha=0.8))
+
+    # Ajustar os labels do eixo x para mostrar apenas o ano
+    ax.set_xticks(subset['Year'][::5])
+    ax.set_xticklabels(subset['Year'][::5], rotation=45, ha='right', fontsize=14, fontfamily='Avenir')
+
+    # Ajustar os limites do eixo y
+    ax.set_ylim(7, 50)
+
+    # Configurar os rótulos e o título para cada gráfico
+    if month in [1, 4, 7, 10]:
+        ax.set_ylabel('Temperature (°C)'.upper(), fontsize=14, fontweight='bold', fontfamily='Avenir Next')
+    else:
+        ax.set_ylabel('')
+
+    if month in [10, 11, 12]:
+        ax.set_xlabel('Year'.upper(), fontsize=14, fontweight='bold', fontfamily='Avenir Next')
+    else:
+        ax.set_xlabel('')
+
+    ax.set_title(pd.to_datetime(f'2000-{month:02d}-01').strftime('%B').upper(), fontsize=16, fontweight='bold', fontfamily='Avenir')
+
+    # Remover o grid e adicionar bordas nos eixos X e Y
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_edgecolor('lightgray')
+        spine.set_linewidth(1)
+
+# Adicionar título e fonte
+fig.suptitle("AVERAGE TEMPERATURE VARIATION IN SÃO JOSÉ DO RIO PRETO, BRAZIL\n(1998-2024)", fontsize=24, fontweight='bold', fontfamily='Avenir Next')
+
+# Adicionar a legenda
+handles = [
+    plt.Line2D([0], [0], color='lightsalmon', linewidth=2, linestyle='-', label='Mean Max Temp'),
+    plt.Line2D([0], [0], color='lightskyblue', linewidth=2, linestyle='-', label='Mean Min Temp'),
+    plt.Line2D([0], [0], color='deepskyblue', linewidth=2, linestyle='--', label='Avg Min Temp'),
+    plt.Line2D([0], [0], color='darksalmon', linewidth=2, linestyle='--', label='Avg Max Temp')
+]
+
+fig.legend(handles=handles, loc='lower left', bbox_to_anchor=(0.01, 0.01), fontsize=12, title='Legend', title_fontsize='12', frameon=False, ncol=2)
+
+plt.figtext(0.95, 0.02, 'Source: Portal Agrometeorológico e Hidrológico do Estado de São Paulo'.upper(), 
+            ha='right', fontsize=14, color='black', fontstyle='italic', fontfamily='Avenir')
+
+# Ajustar o layout para remover espaços
+plt.tight_layout(rect=[0, 0.05, 0.93, 0.95])
+
+# Salvar o gráfico em alta qualidade
+plt.savefig("TEMPERATURE_VARIATION.png", format='png', dpi=300, bbox_inches='tight')
+
+# Exibir o gráfico
+plt.show()
+
+# 3. Umidade do ar
+
+# Definir a fonte
+mpl.rcParams['font.family'] = 'Avenir'
+
+# Criar uma figura com subplots
+fig, axes = plt.subplots(4, 3, figsize=(18, 24), sharex=True, sharey=True)
+axes = axes.flatten()  # Facilita a iteração sobre os subplots
+
+# Definir o estilo de fundo
+sns.set_theme(style="white")
+
+# Calcular a média mínima e máxima para cada mês ao longo dos anos
+monthly_avg_min_humidity = dados_df.groupby('Month')['Min Avg Air Humidity (%)'].mean()
+monthly_avg_max_humidity = dados_df.groupby('Month')['Max Avg Air Humidity (%)'].mean()
+
+# Criar os gráficos
+for month in range(1, 13):  # Para cada mês de 1 a 12
+    subset = dados_df[dados_df['Month'] == month].copy()
+    ax = axes[month - 1]
+
+    # Plotar a linha de tendência da umidade média máxima
+    ax.plot(subset['Year'], subset['Max Avg Air Humidity (%)'], color='lightskyblue', linestyle='-', linewidth=2, zorder=2)
+    
+    # Plotar a linha de tendência da umidade média mínima
+    ax.plot(subset['Year'], subset['Min Avg Air Humidity (%)'], color='lightsalmon', linestyle='-', linewidth=2, zorder=2)
+
+    # Preencher a área entre os marcadores
+    ax.fill_between(subset['Year'], subset['Min Avg Air Humidity (%)'], subset['Max Avg Air Humidity (%)'],
+                    color='lightgray', alpha=0.3, zorder=1)
+    
+    # Plotar as hastes com umidade máxima e mínima
+    for i in range(len(subset)):
+        ax.plot([subset['Year'].iloc[i]] * 2,
+                [subset['Min Avg Air Humidity (%)'].iloc[i], subset['Max Avg Air Humidity (%)'].iloc[i]],
+                color='whitesmoke', linestyle='-', linewidth=2.5, zorder=1)
+        ax.fill_between([subset['Year'].iloc[i]] * 2,
+                        subset['Min Avg Air Humidity (%)'].iloc[i], subset['Max Avg Air Humidity (%)'].iloc[i],
+                        color='lightgray', alpha=0.5)
+        
+        # Marcador para umidade mínima
+        ax.scatter(subset['Year'].iloc[i], subset['Min Avg Air Humidity (%)'].iloc[i], color='lightsalmon', s=100, zorder=5)
+        # Marcador para umidade máxima
+        ax.scatter(subset['Year'].iloc[i], subset['Max Avg Air Humidity (%)'].iloc[i], color='lightskyblue', s=100, zorder=5)
+
+    # Adicionar linhas de tendência para a média mínima e máxima
+    min_avg_line = monthly_avg_min_humidity[month]
+    max_avg_line = monthly_avg_max_humidity[month]
+    ax.axhline(min_avg_line, color='darksalmon', linestyle='--', linewidth=2, zorder=3)
+    ax.axhline(max_avg_line, color='deepskyblue', linestyle='--', linewidth=2, zorder=3)
+
+    # Adicionar o valor das médias no canto superior direito
+    ax.text(subset['Year'].max() + 0.5, min_avg_line, f'{min_avg_line:.1f}%', fontfamily='Avenir Next', color='darksalmon', 
+            ha='left', va='center', fontsize=16, fontweight='bold', bbox=dict(facecolor='white', edgecolor='none', alpha=0.8))
+    ax.text(subset['Year'].max() + 0.5, max_avg_line, f'{max_avg_line:.1f}%', fontfamily='Avenir Next', color='deepskyblue', 
+            ha='left', va='center', fontsize=16, fontweight='bold', bbox=dict(facecolor='white', edgecolor='none', alpha=0.8))
+
+    # Ajustar os labels do eixo x para mostrar apenas o ano
+    ax.set_xticks(subset['Year'][::5])
+    ax.set_xticklabels(subset['Year'][::5], rotation=45, ha='right', fontsize=14, fontfamily='Avenir')
+
+    # Ajustar os limites do eixo y
+    ax.set_ylim(0, 100)
+
+    # Configurar os rótulos e o título para cada gráfico
+    if month in [1, 4, 7, 10]:
+        ax.set_ylabel('Humidity (%)'.upper(), fontsize=14, fontweight='bold', fontfamily='Avenir Next')
+    else:
+        ax.set_ylabel('')
+
+    if month in [10, 11, 12]:
+        ax.set_xlabel('Year'.upper(), fontsize=14, fontweight='bold', fontfamily='Avenir Next')
+    else:
+        ax.set_xlabel('')
+
+    ax.set_title(pd.to_datetime(f'2000-{month:02d}-01').strftime('%B').upper(), fontsize=16, fontweight='bold', fontfamily='Avenir')
+
+    # Remover o grid e adicionar bordas nos eixos X e Y
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_edgecolor('lightgray')
+        spine.set_linewidth(1)
+
+# Adicionar título e fonte
+fig.suptitle("AVERAGE AIR HUMIDITY VARIATION IN SÃO JOSÉ DO RIO PRETO, BRAZIL\n(1998-2024)", fontsize=24, fontweight='bold', fontfamily='Avenir Next')
+
+# Adicionar a legenda
+handles = [
+    plt.Line2D([0], [0], color='lightskyblue', linewidth=2, linestyle='-', label='Max Avg Humidity'),
+    plt.Line2D([0], [0], color='lightsalmon', linewidth=2, linestyle='-', label='Min Avg Humidity'),
+    plt.Line2D([0], [0], color='darksalmon', linewidth=2, linestyle='--', label='Avg Min Humidity'),
+    plt.Line2D([0], [0], color='deepskyblue', linewidth=2, linestyle='--', label='Avg Max Humidity')
+]
+
+fig.legend(handles=handles, loc='lower left', bbox_to_anchor=(0.01, 0.01), fontsize=12, title='Legend', title_fontsize='12', frameon=False, ncol=2)
+
+plt.figtext(0.95, 0.02, 'Source: Portal Agrometeorológico e Hidrológico do Estado de São Paulo'.upper(), 
+            ha='right', fontsize=14, color='black', fontstyle='italic', fontfamily='Avenir')
+
+# Ajustar o layout para remover espaços
+plt.tight_layout(rect=[0, 0.05, 0.93, 0.95])
+
+# Salvar o gráfico em alta qualidade
+plt.savefig("HUMIDITY_VARIATION.png", format='png', dpi=300, bbox_inches='tight')
+
+# Exibir o gráfico
+plt.show()
+
+## Fim
