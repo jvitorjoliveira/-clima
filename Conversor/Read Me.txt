@@ -1,1 +1,8 @@
-Aproveitando os dados que analisei recentemente e uma atividade da formação que estou fazendo com a biblioteca Tkinter (biblioteca do Python para criar interfaces gráficas no desktop), desenvolvi uma calculadora básica para simular uma função do app Clima do iOS. A ideia era mostrar quantos graus a temperatura atual está acima da média histórica. Foi uma experiência muito interessante, pois comecei o projeto no Mac e finalizei/rodei no Windows. Apesar das diferenças entre os sistemas, o programa se adaptou perfeitamente a ambos. É um programa simples, mas foi muito legal de fazer! Não imaginava que iria gostar tanto de trabalhar com interfaces gráficas.
+Aproveitando os dados que analisei recentemente e uma atividade da formação que estou fazendo com a biblioteca Tkinter 
+(biblioteca do Python para criar interfaces gráficas no desktop), 
+desenvolvi uma calculadora básica para simular uma função do app Clima do iOS. 
+A ideia era mostrar quantos graus a temperatura atual está acima da média histórica. 
+Foi uma experiência muito interessante, pois comecei o projeto no Mac e finalizei/rodei no Windows. 
+Apesar das diferenças entre os sistemas, o programa se adaptou perfeitamente a ambos. 
+É um programa simples, mas foi muito legal de fazer! 
+Não imaginava que iria gostar tanto de trabalhar com interfaces gráficas.
